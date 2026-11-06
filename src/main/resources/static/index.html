@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Digital Library</title>
+    <style>
+        body{font-family:Arial,sans-serif;max-width:960px;margin:20px auto;padding:0 12px;background:#f5f7fa}
+        h1{text-align:center}
+        section{background:#fff;border:1px solid #d5d9e0;border-radius:8px;padding:14px;margin-bottom:18px}
+        input{padding:6px;margin:3px}
+        button{padding:6px 12px;cursor:pointer;margin:3px}
+        table{width:100%;border-collapse:collapse;margin-top:10px}
+        th,td{border:1px solid #ddd;padding:6px;text-align:left}
+        th{background:#eef1f6}
+        #msg{padding:10px;border-radius:6px;margin-bottom:12px;display:none}
+        .ok{background:#d4edda}.err{background:#f8d7da}
+    </style>
+</head>
+<body>
+<h1>📚 Digital Library Management</h1>
+<div id="msg"></div>
+
+<section>
+    <h2>Books</h2>
+    <input id="title" placeholder="Title">
+    <input id="author" placeholder="Author">
+    <input id="isbn" placeholder="ISBN">
+    <input id="category" placeholder="Category">
+    <button onclick="addBook()">Add Book</button><br>
+    <input id="keyword" placeholder="Search title or author">
+    <button onclick="searchBooks()">Search</button>
+    <button onclick="loadBooks()">Show All</button>
+    <table id="bookTable"></table>
+</section>
+
+<section>
+    <h2>Members</h2>
+    <input id="mname" placeholder="Name">
+    <input id="memail" placeholder="Email">
+    <input id="mphone" placeholder="Phone">
+    <button onclick="addMember()">Add Member</button>
+    <table id="memberTable"></table>
+</section>
+
+<section>
+    <h2>Issue / Return</h2>
+    <input id="bookId" placeholder="Book ID" type="number">
+    <input id="memberId" placeholder="Member ID" type="number">
+    <button onclick="issueBook()">Issue Book</button>
+    <button onclick="loadIssues()">Refresh</button>
+    <table id="issueTable"></table>
+</section>
+
+<script>
+    function esc(s){return String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+    function show(text, ok){
+        const m = document.getElementById('msg');
+        m.textContent = text;
+        m.className = ok ? 'ok' : 'err';
+        m.style.display = 'block';
+        setTimeout(()=>m.style.display='none', 4000);
+    }
+
+    async function api(url, options){
+        const res = await fetch(url, options);
+        if(!res.ok){
+            let text = res.statusText;
+            try{ const e = await res.json(); text = e.message || e.error || text; }catch(_){}
+            throw new Error(text);
+        }
+        return res.status === 204 ? null : res.json();
+    }
+
+    const JSON_HEADERS = {'Content-Type':'application/json'};
+    const val = id => document.getElementById(id).value.trim();
+
+    /* ---------- Books ---------- */
+    function renderBooks(books){
+        let h = '<tr><th>ID</th><th>Title</th><th>Author</th><th>Category</th><th>Status</th><th>Action</th></tr>';
+        books.forEach(b=>{
+            h += `<tr><td>${b.id}</td><td>${esc(b.title)}</td><td>${esc(b.author)}</td><td>${esc(b.category)}</td>
+          <td>${b.available ? '✅ Available' : '❌ Issued'}</td>
+          <td><button onclick="deleteBook(${b.id})">Delete</button></td></tr>`;
+        });
+        document.getElementById('bookTable').innerHTML = h;
+    }
+    async function loadBooks(){
+        try{ renderBooks(await api('/api/books')); }catch(e){ show(e.message,false); }
+    }
+    async function searchBooks(){
+        try{
+            const books = await api('/api/books/search?keyword=' + encodeURIComponent(val('keyword')));
+            renderBooks(books);
+            if(books.length === 0) show('No books found', false);
+        }catch(e){ show(e.message,false); }
+    }
+    async function addBook(){
+        try{
+            await api('/api/books',{method:'POST',headers:JSON_HEADERS,body:JSON.stringify(
+                    {title:val('title'),author:val('author'),isbn:val('isbn'),category:val('category')})});
+            show('Book added',true);
+            ['title','author','isbn','category'].forEach(i=>document.getElementById(i).value='');
+            loadBooks();
+        }catch(e){ show(e.message,false); }
+    }
+    async function deleteBook(id){
+        try{ await api('/api/books/'+id,{method:'DELETE'}); show('Book deleted',true); loadBooks(); }
+        catch(e){ show(e.message,false); }
+    }
+
+    /* ---------- Members ---------- */
+    async function loadMembers(){
+        try{
+            const members = await api('/api/members');
+            let h = '<tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Action</th></tr>';
+            members.forEach(m=>{
+                h += `<tr><td>${m.id}</td><td>${esc(m.name)}</td><td>${esc(m.email)}</td><td>${esc(m.phone)}</td>
+            <td><button onclick="deleteMember(${m.id})">Delete</button></td></tr>`;
+            });
+            document.getElementById('memberTable').innerHTML = h;
+        }catch(e){ show(e.message,false); }
+    }
+    async function addMember(){
+        try{
+            await api('/api/members',{method:'POST',headers:JSON_HEADERS,body:JSON.stringify(
+                    {name:val('mname'),email:val('memail'),phone:val('mphone')})});
+            show('Member added',true);
+            ['mname','memail','mphone'].forEach(i=>document.getElementById(i).value='');
+            loadMembers();
+        }catch(e){ show(e.message,false); }
+    }
+    async function deleteMember(id){
+        try{ await api('/api/members/'+id,{method:'DELETE'}); show('Member deleted',true); loadMembers(); }
+        catch(e){ show(e.message,false); }
+    }
+
+    /* ---------- Issue / Return ---------- */
+    async function loadIssues(){
+        try{
+            const list = await api('/api/issues');
+            let h = '<tr><th>ID</th><th>Book</th><th>Member</th><th>Issued</th><th>Due</th><th>Returned</th><th>Fine</th><th>Action</th></tr>';
+            list.forEach(r=>{
+                h += `<tr><td>${r.id}</td><td>${esc(r.book.title)}</td><td>${esc(r.member.name)}</td>
+            <td>${r.issueDate}</td><td>${r.dueDate}</td><td>${r.returnDate ?? '-'}</td><td>Rs.${r.fine}</td>
+            <td>${r.returnDate ? 'Returned' : `<button onclick="returnBook(${r.id})">Return</button>`}</td></tr>`;
+            });
+            document.getElementById('issueTable').innerHTML = h;
+        }catch(e){ show(e.message,false); }
+    }
+    async function issueBook(){
+        try{
+            await api(`/api/issues?bookId=${val('bookId')}&memberId=${val('memberId')}`,{method:'POST'});
+            show('Book issued',true); loadBooks(); loadIssues();
+        }catch(e){ show(e.message,false); }
+    }
+    async function returnBook(id){
+        try{
+            const r = await api(`/api/issues/${id}/return`,{method:'PUT'});
+            show('Book returned. Fine: Rs.' + r.fine, true); loadBooks(); loadIssues();
+        }catch(e){ show(e.message,false); }
+    }
+
+    loadBooks(); loadMembers(); loadIssues();
+</script>
+</body>
+</html>
+
