@@ -40,8 +40,19 @@ Create DB `librarydb`, put your password in `application-mysql.properties`, then
 Double-click `run.bat` (needs JDK 17), or in IntelliJ: File > Open > select `pom.xml` > Open as Project.
 
 ## Screenshots
-![Home](screenshots/home.png)
-![Issued](screenshots/issued.png)
-![Error](screenshots/error.png)
-![Return](screenshots/return.png)
-![Search](screenshots/search.png)
+## Screenshots
+
+### Home
+![Home](Screenshots/home.png)
+
+### Book Issued
+![Issued](Screenshots/issued.png)
+
+### Error Message
+![Error](Screenshots/error.png)
+
+### Return with Fine
+![Return](Screenshots/return.png)
+
+### Search
+![Search](Screenshots/search.png)
